@@ -1,0 +1,9 @@
+# Dependencies
+node_modules/
+
+# Environment Variables (Sangat Rahasia)
+.env
+
+# WhatsApp Web JS Session & Cache (Rahasia & Sementara)
+.wwebjs_auth/
+.wwebjs_cache/

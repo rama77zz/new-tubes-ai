@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSC Chatbot Arena</title>
+    <style>
+        :root {
+            --wa-bg: #efeae2;
+            --wa-header: #b31117;
+            --wa-text: #111b21;
+            --wa-bubble-user: #d9fdd3;
+            --wa-bubble-bot: #ffffff;
+            --wa-border: #e9edef;
+            --wa-input-bg: #f0f2f5;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: #dadbd3;
+            color: var(--wa-text);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 100vw;
+            height: 100vh;
+            background: var(--wa-bg);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: var(--wa-header);
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            align-items: center;
+        }
+
+        .bot-profile {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .bot-avatar {
+            width: 45px;
+            height: 45px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+        }
+
+        .bot-info h2 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .bot-info p {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 30px 10%;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+        }
+
+        .message-bubble {
+            max-width: 75%;
+            padding: 12px 18px;
+            border-radius: 12px;
+            font-size: 15px;
+            line-height: 1.4;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            word-wrap: break-word;
+        }
+
+        .message-bubble.user {
+            background: var(--wa-bubble-user);
+            align-self: flex-end;
+            border-top-right-radius: 2px;
+        }
+
+        .message-bubble.bot {
+            background: var(--wa-bubble-bot);
+            align-self: flex-start;
+            border-top-left-radius: 2px;
+        }
+
+        .timestamp {
+            font-size: 10px;
+            color: #747f83;
+            float: right;
+            margin-top: 5px;
+            margin-left: 10px;
+        }
+
+        .chat-input-area {
+            background: var(--wa-input-bg);
+            padding: 15px 10%;
+            border-top: 1px solid var(--wa-border);
+        }
+
+        .chat-form {
+            display: flex;
+            width: 100%;
+            gap: 15px;
+        }
+
+        .input-message {
+            flex: 1;
+            background: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 25px;
+            font-size: 15px;
+            outline: none;
+        }
+
+        .btn-send {
+            background: var(--wa-header);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .typing-indicator {
+            align-self: flex-start;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 8px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            color: #667781;
+            display: none;
+            font-style: italic;
+        }
+
+        /* GAYA UNTUK TOMBOL KEMBALI */
+        .btn-back {
+            color: white;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            padding: 5px;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+
+        .btn-back:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-back svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        @media (max-width: 768px) {
+
+            .chat-messages,
+            .chat-input-area {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+
+            .message-bubble {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="chat-container">
+        <header class="chat-header">
+            <div class="bot-profile">
+                <a href="/index.html" class="btn-back" title="Kembali ke Dashboard">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
+                    </svg>
+                </a>
+
+                <div class="bot-avatar">🤖</div>
+                <div class="bot-info">
+                    <h2>Smart Chatbot SSC Arena</h2>
+                    <p>Pusat Informasi Akademik Resmi Telkom University Surabaya</p>
+                </div>
+            </div>
+        </header>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message-bubble bot">
+                Halo! Selamat datang di Tab Chat SSC. Silakan tanyakan apa saja seputar pedoman akademik
+                <div class="timestamp" id="botTime">00:00</div>
+            </div>
+            <div class="typing-indicator" id="typingIndicator">Sedang membaca buku pedoman akademik...</div>
+        </div>
+
+        <div class="chat-input-area">
+            <form class="chat-form" id="chatForm">
+                <input type="text" id="userInput" class="input-message" placeholder="Tulis pertanyaan Anda di sini..."
+                    autocomplete="off" required>
+                <button type="submit" class="btn-send">Kirim</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const chatForm = document.getElementById('chatForm');
+        const userInput = document.getElementById('userInput');
+        const chatMessages = document.getElementById('chatMessages');
+        const typingIndicator = document.getElementById('typingIndicator');
+
+        const uniqueUserId = 'web-tab-' + Math.random().toString(36).substr(2, 9);
+
+        function getFormattedTime() {
+            const now = new Date();
+            return now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+        }
+
+        document.getElementById('botTime').innerText = getFormattedTime();
+
+        function appendMessage(text, sender) {
+            const bubble = document.createElement('div');
+            bubble.classList.add('message-bubble', sender);
+
+            const timeDiv = document.createElement('div');
+            timeDiv.classList.add('timestamp');
+            timeDiv.innerText = getFormattedTime();
+
+            bubble.innerText = text;
+            bubble.appendChild(timeDiv);
+
+            chatMessages.insertBefore(bubble, typingIndicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const messageText = userInput.value.trim();
+            if (!messageText) return;
+
+            appendMessage(messageText, 'user');
+            userInput.value = '';
+
+            typingIndicator.style.display = 'block';
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: messageText,
+                        userId: uniqueUserId
+                    })
+                });
+
+                const data = await response.json();
+                typingIndicator.style.display = 'none';
+
+                if (data.reply) {
+                    appendMessage(data.reply, 'bot');
+                } else {
+                    appendMessage('Maaf, tidak ada respon dari server.', 'bot');
+                }
+            } catch (error) {
+                console.error(error);
+                typingIndicator.style.display = 'none';
+                appendMessage('Gagal terhubung dengan server.', 'bot');
+            }
+        });
+    </script>
+</body>
+
+</html>

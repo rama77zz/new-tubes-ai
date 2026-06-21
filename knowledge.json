@@ -1,0 +1,49 @@
+{
+  "keywords": {
+    "sapaan": [
+      "halo",
+      "hai",
+      "hei",
+      "p",
+      "ping",
+      "pagi",
+      "siang",
+      "sore",
+      "malam",
+      "assalamualaikum",
+      "samlikum",
+      "test",
+      "bot"
+    ],
+    "terima_kasih": [
+      "terima kasih",
+      "makasih",
+      "tq",
+      "thanks",
+      "suwun",
+      "oke",
+      "ok",
+      "sip",
+      "baik",
+      "thank you",
+      "nuhun"
+    ],
+    "operasional": [
+      "jam buka",
+      "jam tutup",
+      "ssc buka",
+      "ssc tutup",
+      "loket ssc",
+      "kantor ssc",
+      "onsite ssc",
+      "jadwal ssc",
+      "jam operasional",
+      "layanan onsite"
+    ]
+  },
+  "responses": {
+    "sapaan": "Halo! Saya adalah Smart Chatbot SSC Telkom University Surabaya. Ada yang bisa saya bantu terkait informasi administrasi akademik kampus?",
+    "terima_kasih": "Sama-sama! Jangan ragu untuk mengetik di sini lagi jika Anda memiliki pertanyaan lain seputar akademik. Semoga harimu menyenangkan! 😊",
+    "operasional": "Layanan onsite Student Service Center (SSC) Telkom University Surabaya dibuka pada hari kerja, yaitu Senin – Jumat pukul 08.00 – 16.00 WIB."
+  }
+}

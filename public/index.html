@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSC Telkom University Surabaya</title>
+    <style>
+        :root {
+            --wa-bg: #fcf4ec;
+            --wa-green: #b31117;
+            --wa-text: #111b21;
+            --wa-border: #111b21;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--wa-bg);
+            color: var(--wa-text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 50px;
+        }
+
+        .logo-container {
+            font-weight: bold;
+            font-size: 20px;
+            color: var(--wa-green);
+        }
+
+        .btn-staff {
+            color: var(--wa-text);
+            text-decoration: none;
+            font-size: 14px;
+            border: 1px solid var(--wa-border);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 500;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 40px 10%;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .left-content {
+            flex: 1;
+            max-width: 500px;
+        }
+
+        .left-content h1 {
+            font-size: 85px;
+            line-height: 1.05;
+            letter-spacing: -2px;
+            margin-bottom: 40px;
+            font-weight: 500;
+        }
+
+        /* TOMBOL UTAMA: Membuka chat.html di Tab Baru */
+        .btn-start-chat {
+            display: inline-block;
+            text-decoration: none;
+            color: var(--wa-text);
+            border: 1px solid var(--wa-border);
+            padding: 14px 32px;
+            border-radius: 30px;
+            font-size: 18px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-start-chat:hover {
+            background: var(--wa-border);
+            color: white;
+        }
+
+        .right-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            position: relative;
+            max-width: 500px;
+        }
+
+        .chat-bubble-static {
+            background: #ffffff;
+            padding: 16px 20px;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+            max-width: 350px;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+
+        .bubble-1 { align-self: flex-start; border-top-left-radius: 4px; }
+        .bubble-2 { align-self: flex-end; border-top-right-radius: 4px; margin-top: 150px; }
+
+        .doodle-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -60%);
+            width: 200px;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 900px) {
+            main { flex-direction: column; text-align: center; padding: 20px 5%; }
+            .left-content h1 { font-size: 50px; }
+            .right-content { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo-container">SSC TUS</div>
+    </nav>
+
+    <main>
+        <div class="left-content">
+            <h1>Halo.<br>Butuh Bantuan<br>Akademik?</h1>
+            <a href="/chat.html" target="_blank" class="btn-start-chat">
+                Mulai Tanya Chatbot
+            </a>
+        </div>
+
+        <div class="right-content">
+            <div class="chat-bubble-static bubble-1">
+                Bingung nyari aturan pengambilan SKS dan skor minimal EPrT? 
+            </div>
+            <div class="doodle-container">
+                <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="100" cy="100" r="80" stroke="#111B21" stroke-width="4"/>
+                    <path d="M60 90C60 90 70 80 85 90M140 90C140 90 130 80 115 90" stroke="#111B21" stroke-width="4"/>
+                    <path d="M80 135C80 134 95 120 120 135" stroke="#111B21" stroke-width="4"/>
+                </svg>
+            </div>
+            <div class="chat-bubble-static bubble-2">
+                Smart Chatbot SSC siap menjawab otomatis pertanyaan Anda 24/7.
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>
