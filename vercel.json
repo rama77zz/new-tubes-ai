@@ -4,12 +4,13 @@
     {
       "src": "server-v2.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "public/**",
-      "use": "@vercel/static"
     }
   ],
+  "functions": {
+    "server-v2.js": {
+      "maxDuration": 10
+    }
+  },
   "routes": [
     {
       "src": "/api/(.*)",
@@ -17,15 +18,15 @@
     },
     {
       "src": "/chat.html",
-      "dest": "public/chat.html"
+      "dest": "/chat.html"
     },
     {
       "src": "/",
-      "dest": "public/index.html"
+      "dest": "/index.html"
     },
     {
-      "src": "/(.*)",
-      "dest": "public/$1"
+      "src": "/(.*\\..*)",
+      "dest": "/$1"
     }
   ]
 }

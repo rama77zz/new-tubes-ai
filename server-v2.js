@@ -2,31 +2,37 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
-const fs = require('fs');
 const path = require('path');
 const Groq = require('groq-sdk');
-const multer = require('multer'); 
+const multer = require('multer');
 const { put } = require('@vercel/blob');
-const RAGEngine = require('./lib/rag');
-const DatasetManager = require('./lib/dataset');
+
+// ====================================================================
+// VERCEL SERVERLESS FIX: Lazy-load modul berat agar tidak crash saat cold start
+// ====================================================================
+let RAGEngine, DatasetManager;
+try {
+    RAGEngine = require('./lib/rag');
+    DatasetManager = require('./lib/dataset');
+} catch (e) {
+    console.error("Gagal load modul lib:", e.message);
+}
 
 const app = express();
-const PORT = process.env.PORT || 3001;
 
+// Middleware Setup
 app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static('public'));
+app.use(bodyParser.json({ limit: '5mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '5mb' }));
 
 // ====================================================================
-// CONFIG UPLOAD: MENGGUNAKAN MEMORY STORAGE (TIDAK MENULIS DISK LOKAL)
+// CONFIG UPLOAD: MENGGUNAKAN MEMORY STORAGE (WAJIB DI VERCEL)
 // ====================================================================
 const storage = multer.memoryStorage();
-
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 4.5 * 1024 * 1024 // Batasan payload maksimal Serverless Vercel (4.5 MB)
+        fileSize: 4.5 * 1024 * 1024 // Batas payload Serverless Vercel (4.5 MB)
     },
     fileFilter: function (req, file, cb) {
         const ext = path.extname(file.originalname).toLowerCase();
@@ -39,98 +45,92 @@ const upload = multer({
 
 // Inisialisasi Groq SDK
 const groq = new Groq({
-    apiKey: process.env.GROQ_API_KEY
+    apiKey: process.env.GROQ_API_KEY || "dummy_key"
 });
 
-const ragEngine = new RAGEngine();
-const datasetManager = new DatasetManager();
+// Inisialisasi engine RAG dan Dataset
+let ragEngine = null;
+let datasetManager = null;
 
-// Memori penyimpan riwayat obrolan berbasis sesi website agar percakapan nyambung
-const chatHistories = new Map();
+try {
+    if (RAGEngine) ragEngine = new RAGEngine();
+} catch (e) {
+    console.error("Gagal inisialisasi RAGEngine:", e.message);
+}
 
-const knowledgeFile = path.join(__dirname, 'knowledge.json');
-const behaviorFile = path.join(__dirname, 'config', 'behavior.json');
+try {
+    if (DatasetManager) datasetManager = new DatasetManager();
+} catch (e) {
+    console.error("Gagal inisialisasi DatasetManager:", e.message);
+}
 
-// Memastikan file knowledge.json awal tersedia
-if (!fs.existsSync(knowledgeFile)) {
-    try {
-        fs.writeFileSync(knowledgeFile, JSON.stringify({ keywords: {}, responses: {} }, null, 2));
-    } catch (e) {
-        console.warn('[Storage Warning] Gagal menginisialisasi knowledge.json lokal di serverless environment.');
+// ====================================================================
+// VERCEL FIX: Knowledge store in-memory (filesystem Vercel read-only)
+// Jika butuh persistence, pindahkan ke Vercel KV / database eksternal
+// ====================================================================
+let inMemoryKnowledge = { keywords: {}, responses: {} };
+
+// Coba baca knowledge.json dari bundle (read-only, hanya saat deploy pertama)
+try {
+    const fs = require('fs');
+    const knowledgeFile = path.join(__dirname, 'knowledge.json');
+    if (fs.existsSync(knowledgeFile)) {
+        const data = fs.readFileSync(knowledgeFile, 'utf8');
+        inMemoryKnowledge = JSON.parse(data);
+        console.log('[Knowledge] Berhasil memuat knowledge.json dari bundle deploy.');
     }
+} catch (e) {
+    console.warn('[Knowledge] knowledge.json tidak ditemukan, menggunakan store kosong.');
 }
 
 function loadKnowledge() {
-    try {
-        if (!fs.existsSync(knowledgeFile)) return { keywords: {}, responses: {} };
-        const data = fs.readFileSync(knowledgeFile, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error('Error loading knowledge:', error);
-        return { keywords: {}, responses: {} };
-    }
+    return inMemoryKnowledge;
 }
 
 function saveKnowledge(data) {
     try {
-        fs.writeFileSync(knowledgeFile, JSON.stringify(data, null, 2));
-        ragEngine.clearCache();
+        inMemoryKnowledge = data;
+        if (ragEngine && typeof ragEngine.clearCache === 'function') ragEngine.clearCache();
         return true;
     } catch (error) {
-        console.error('Error saving knowledge:', error);
+        console.error('Error saving knowledge (in-memory):', error);
         return false;
     }
 }
 
-function loadBehavior() {
-    try {
-        if (!fs.existsSync(behaviorFile)) return null;
-        const content = fs.readFileSync(behaviorFile, 'utf8');
-        return JSON.parse(content);
-    } catch (error) {
-        console.error('Error loading behavior config:', error.message);
-        return null;
-    }
-}
-
-function saveBehavior(obj) {
-    try {
-        fs.mkdirSync(path.dirname(behaviorFile), { recursive: true });
-        fs.writeFileSync(behaviorFile, JSON.stringify(obj, null, 2));
-        return true;
-    } catch (error) {
-        console.error('Error saving behavior config:', error.message);
-        return false;
-    }
-}
+// ====================================================================
+// Chat history in-memory (akan reset pada setiap cold start Vercel)
+// ====================================================================
+const chatHistories = new Map();
 
 /**
  * Memproses pesan ke API Groq menggunakan Konteks RAG dan Riwayat Obrolan
  */
 async function getAIResponse(message, contextItems = [], behavior = null, userId) {
     try {
+        if (!ragEngine) throw new Error("RAGEngine tidak terinisialisasi");
+
         const contextBlock = ragEngine.buildContextBlock(contextItems);
         if (!behavior) {
-            behavior = loadBehavior() || {
-                system_instructions: 'Jawab berdasarkan konteks.',
-                fallback_response: 'Mohon maaf, data tidak ditemukan.',
-                max_sentences: 2,
+            behavior = {
+                system_instructions: 'Jawab berdasarkan konteks aturan akademik SSC TUS secara formal dan solutif.',
+                fallback_response: 'Mohon maaf, data tersebut tidak ditemukan dalam dokumen pedoman akademik resmi kami.',
+                max_sentences: 3,
                 language: 'id'
             };
         }
 
-        const contextText = contextItems.length > 0 
-            ? `\n\nKonteks Dokumen Akademik TUS Resmi:\n${contextBlock}` 
+        const contextText = contextItems.length > 0
+            ? `\n\nKonteks Dokumen Akademik TUS Resmi:\n${contextBlock}`
             : `\n\nKonteks Dokumen Akademik TUS: [Tidak ada aturan akademik spesifik yang relevan dengan pertanyaan mahasiswa saat ini]`;
 
-        const systemParts = [];
-        if (behavior.system_instructions) systemParts.push(behavior.system_instructions);
-        
-        systemParts.push(`\nPanduan Ekstra: Jika pertanyaan menanyakan produk atau hal yang tidak ada di Konteks Data Akademik, katakan: "${behavior.fallback_response}"`);
-        systemParts.push(`Jawab maksimal ${behavior.max_sentences || 3} kalimat. Bahasa: ${behavior.language || 'id'}.`);
-        
-        const systemMessage = systemParts.join(' ') + contextText;
+        const systemParts = [
+            behavior.system_instructions,
+            `\nPanduan Ekstra: Jika pertanyaan menanyakan hal di luar regulasi akademik atau tidak tercantum di Konteks Data Akademik, katakan: "${behavior.fallback_response}"`,
+            `Jawab maksimal ${behavior.max_sentences || 3} kalimat. Bahasa: ${behavior.language || 'id'}.`
+        ];
 
+        const systemMessage = systemParts.join(' ') + contextText;
         let history = chatHistories.get(userId) || [];
 
         const messages = [
@@ -142,7 +142,7 @@ async function getAIResponse(message, contextItems = [], behavior = null, userId
         const completion = await groq.chat.completions.create({
             messages: messages,
             model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
-            max_tokens: Number(process.env.GROQ_MAX_TOKENS || 200),
+            max_tokens: Number(process.env.GROQ_MAX_TOKENS || 250),
             temperature: 0.2
         });
 
@@ -154,9 +154,8 @@ async function getAIResponse(message, contextItems = [], behavior = null, userId
         if (history.length > 10) {
             history = history.slice(history.length - 10);
         }
-        
-        chatHistories.set(userId, history);
 
+        chatHistories.set(userId, history);
         return aiResponseText;
     } catch (error) {
         console.error('Error getting AI response:', error.message);
@@ -165,9 +164,10 @@ async function getAIResponse(message, contextItems = [], behavior = null, userId
 }
 
 // ====================================================================
-// ENDPOINT UTAMA: Menangani request chat langsung dari Website Frontend
+// ENDPOINT 1: PROSES UTAMA CORE CHATBOT ASSISTANT
 // ====================================================================
 app.post('/api/chat', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     try {
         const { message, userId } = req.body;
         const activeUserId = userId || 'default-web-user';
@@ -178,9 +178,9 @@ app.post('/api/chat', async (req, res) => {
 
         console.log(`[Web Message] User (${activeUserId}): ${message}`);
 
+        // Jalur Cepat 1: Cek FAQ Direct Match dari knowledge store
         const knowledge = loadKnowledge();
-        
-        let pesanMasuk = message.toLowerCase().trim(); 
+        let pesanMasuk = message.toLowerCase().trim();
         let faqResponse = null;
 
         if (knowledge.keywords && knowledge.responses) {
@@ -203,45 +203,27 @@ app.post('/api/chat', async (req, res) => {
         }
 
         if (faqResponse) {
-            console.log(`[Web Chat] Match via knowledge.json`);
             return res.json({ reply: faqResponse, source: 'FAQ Direct Match' });
         }
 
-        const allDocuments = await datasetManager.getAllDocuments();
+        // Jalur RAG
+        if (!datasetManager) {
+            return res.json({ reply: 'Sistem database RAG belum terinisialisasi sempurna.', source: 'Error Fallback' });
+        }
 
+        const allDocuments = await datasetManager.getAllDocuments().catch(() => []);
+
+        // Algoritma Penyelaras Kata (Koreksi Massal Typo)
         const kamusKoreksiMassal = {
-            "yidisium": "yudisium",
-            "yudisum": "yudisium",
-            "yudis": "yudisium",
-            "epert": "eprt toefl",
-            "tofel": "eprt toefl",
-            "bpp": "bpp ukt uang kuliah",
-            "ukt": "bpp ukt uang kuliah",
-            "sksan": "sks maksimal kuota",
-            "krsan": "krs ksm registrasi",
-            "ksman": "krs ksm registrasi",
-            "doswal": "dosen wali perwalian",
-            "skripsian": "skripsi tugas akhir ta",
-            "internsip": "kerja praktik magang wrap",
-            "cumlaud": "cum laude pujian",
-            "comlaude": "cum laude pujian",
-            "dropaut": "drop out sp surat peringatan",
-            "mangkir": "mangkir tidak aktif nonaktif",
-            "semester pendek": "semester antara pendek sp",
-            "rapor": "laporan kemajuan studi lks",
-            "transkrip": "transkrip akademik nilai",
-            "3.5 tahun": "7 semester lulus cepat masa studi normal",
-            "3,5 tahun": "7 semester lulus cepat masa studi normal",
-            "3 setengah tahun": "7 semester lulus cepat masa studi normal",
-            "4 tahun": "8 semester masa studi normal sarjana",
-            "3 tahun": "6 semester masa studi normal diploma tiga",
-            "7 semester": "7 semester lulus cepat masa studi normal",
-            "8 semester": "8 semester masa studi normal sarjana",
-            "6 semester": "6 semester masa studi normal diploma tiga",
-            "nilai minimal": "nilai huruf terendah lulus minimum",
-            "nilai kelulusan": "nilai huruf terendah lulus minimum",
-            "ngulang matkul": "nilai d atau e mengulang mata kuliah",
-            "perbaikan nilai": "nilai d atau e mengulang mata kuliah"
+            "yidisium": "yudisium", "yudisum": "yudisium", "yudis": "yudisium",
+            "epert": "eprt toefl", "tofel": "eprt toefl", "bpp": "bpp ukt uang kuliah",
+            "ukt": "bpp ukt uang kuliah", "sksan": "sks maksimal kuota",
+            "krsan": "krs ksm registrasi", "ksman": "krs ksm registrasi",
+            "doswal": "dosen wali perwalian", "skripsian": "skripsi tugas akhir ta",
+            "internsip": "kerja praktik magang wrap", "cumlaud": "cum laude pujian",
+            "comlaude": "cum laude pujian", "dropaut": "drop out sp surat peringatan",
+            "mangkir": "mangkir tidak aktif nonaktif", "semester pendek": "semester antara pendek sp",
+            "transkrip": "transkrip akademik nilai", "nilai minimal": "nilai huruf terendah lulus minimum"
         };
 
         for (const [salah, benar] of Object.entries(kamusKoreksiMassal)) {
@@ -250,270 +232,126 @@ app.post('/api/chat', async (req, res) => {
             }
         }
 
-        const kataBasaBasi = [
-            "bagaimana", "apakah", "gimana", "sih", "dong", "kak", "min", "tolong", 
-            "mau", "tanya", "saya", "kamu", "itu", "ini", "yang", "di", "ke", "dari", 
-            "bisa", "kah", "bila", "jika", "kalau", "tentang", "mengenai", "untuk",
-            "buat", "ikut", "ada", "nanya", "ya", "kok", "nih", "bisa", "syarat",
-            "cara", "aturan", "ketentuan", "panduan", "adalah", "apa", "biar", "supaya"
-        ];
-
-        let kataKunciInti = pesanMasuk.split(/\s+/)
-            .filter(kata => !kataBasaBasi.includes(kata))
-            .join(" ");
-
-        let queryDibersihkan = kataKunciInti;
+        // Ekspansi Kueri Otomatis
+        let queryDibersihkan = pesanMasuk;
         const kamusEkspansiMaksimal = {
-            "eprt": "eprt toefl ielts kecakapan bahasa inggris skor nilai minimum kelulusan lulus",
-            "toefl": "eprt toefl ielts kecakapan bahasa inggris skor nilai minimum kelulusan lulus",
-            "tak": "tak transkrip aktivitas kemahasiswaan poin minimal organisasi sertifikat",
-            "yudisium": "yudisium dekan sidang penetapan kelulusan ijazah skl fakultas rektor",
-            "wisuda": "syarat lulus kelulusan wisuda ukt lunas publikasi ta ijazah transkrip",
-            "skripsi": "tugas akhir ta skripsi skripsian sidang proposal pembimbing artikel ilmiah",
-            "ta": "tugas akhir ta skripsi skripsian sidang proposal pembimbing artikel ilmiah",
-            "kp": "magang kerja praktik kp wrap internship kerja industri",
-            "magang": "magang kerja praktik kp wrap internship kerja industri",
-            "cuti": "cuti akademik nonaktif bpp status 10 persen tingkat 1 izin pimpinan upps",
-            "sks": "beban belajar sks maksimal kuota ip ips ambil krs semester",
-            "krs": "krs ksm registrasi daftar ulang ukt ksm cetak awal semester",
-            "sp": "semester antara pendek sp remedial kelas perkuliahan memperbaiki nilai 9 sks",
-            "do": "drop out sp surat peringatan evaluation tingkat do spa sanksi akademik",
-            "nilai": "skala nilai bobot indeks mutu konversi a ab b bc c d e terendah",
-            "lks": "laporan kemajuan studi lks orang tua broadcast nilai evaluasi",
-            "fast track": "fast track skema studi percepatan sarjana magister 10 semester ipk 3.25"
+            "eprt": "eprt toefl kecakapan bahasa inggris skor nilai minimum kelulusan lulus",
+            "tak": "tak transkrip aktivitas kemahasiswaan poin organisasi sertifikat",
+            "yudisium": "yudisium dekan sidang penetapan kelulusan ijazah skl fakultas",
+            "wisuda": "syarat lulus kelulusan wisuda ukt lunas ta ijazah",
+            "skripsi": "tugas akhir ta skripsi sidang proposal pembimbing",
+            "ta": "tugas akhir ta skripsi sidang proposal pembimbing",
+            "magang": "magang kerja praktik kp wrap internship",
+            "cuti": "cuti akademik nonaktif status izin pimpinan",
+            "sks": "beban belajar sks maksimal kuota krs semester",
+            "krs": "krs ksm registrasi daftar ulang ukt ksm",
+            "sp": "semester antara pendek sp remedial kelas memperbaiki nilai",
+            "do": "drop out sp surat peringatan evaluation sanksi akademik"
         };
 
         for (const [singkatan, deskripsiPanjang] of Object.entries(kamusEkspansiMaksimal)) {
-            if (pesanMasuk.includes(singkatan) || queryDibersihkan.includes(singkatan)) {
+            if (pesanMasuk.includes(singkatan)) {
                 queryDibersihkan = `${queryDibersihkan} ${deskripsiPanjang}`;
             }
         }
 
-        let history = chatHistories.get(activeUserId) || [];
-        if (history.length >= 2) {
-            const lastUserMsg = history[history.length - 2]?.content || "";
-            if (lastUserMsg.trim() !== "") {
-                const cleanedLastMsg = lastUserMsg
-                    .toLowerCase()
-                    .split(/\s+/)
-                    .filter(k => !kataBasaBasi.includes(k))
-                    .join(" ");
-                    
-                if (cleanedLastMsg.trim() !== "") {
-                    queryDibersihkan = `${cleanedLastMsg} ${queryDibersihkan}`;
-                }
-            }
-        }
-
-        queryDibersihkan = queryDibersihkan.replace(/\s+/g, ' ').trim();
-
-        const contextItems = ragEngine.retrieveContext(
-            queryDibersihkan,
+        const contextItems = ragEngine ? ragEngine.retrieveContext(
+            queryDibersihkan.replace(/\s+/g, ' ').trim(),
             allDocuments,
             Number(process.env.RAG_TOP_K || 6)
-        );
-        
-        console.log(`[Web Chat] RAG Final Extracted Query: "${queryDibersihkan}" -> Retrieved ${contextItems.length} context(s)`);
-        
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('AI response timeout')), 20000)
-        );
-        
-        try {
-            const behavior = loadBehavior();
-            
-            const aiResponse = await Promise.race([
-                getAIResponse(message, contextItems, behavior, activeUserId),
-                timeoutPromise
-            ]);
+        ) : [];
 
-            if (aiResponse && aiResponse.trim() !== "") {
-                return res.json({ reply: aiResponse, source: 'RAG Engine + Groq AI' });
-            } else {
-                return res.json({ 
-                    reply: 'Mohon maaf, saya belum menemukan aturan akademik spesifik mengenai hal tersebut di buku pedoman akademik saat ini. Bisa tolong berikan kata kunci yang lebih jelas?', 
-                    source: 'Safe Fallback' 
-                });
-            }
-        } catch (aiError) {
-            console.error('AI Processing Error:', aiError.message);
-            return res.json({ 
-                reply: 'Maaf, sistem AI sedang mengalami antrean komputasi. Silakan coba kirimkan ulang pertanyaan Anda.', 
-                source: 'Timeout Fallback' 
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('AI response timeout')), 9000) // 9 detik agar tidak melebihi maxDuration 10 detik Vercel
+        );
+
+        const aiResponse = await Promise.race([
+            getAIResponse(message, contextItems, null, activeUserId),
+            timeoutPromise
+        ]);
+
+        if (aiResponse && aiResponse.trim() !== "") {
+            return res.json({ reply: aiResponse, source: 'RAG Engine + Groq AI' });
+        } else {
+            return res.json({
+                reply: 'Mohon maaf, saya belum menemukan regulasi spesifik mengenai hal tersebut di basis data akademik. Coba gunakan kata kunci yang lain.',
+                source: 'Safe Fallback'
             });
         }
     } catch (error) {
         console.error('API Chat Error:', error.message);
-        return res.status(500).json({ error: 'Internal Server Error' });
+        return res.json({
+            reply: 'Maaf, asisten cerdas sedang mengalami gangguan komunikasi. Silakan kirimkan ulang pesan Anda.',
+            source: 'Global Exception Fallback'
+        });
     }
 });
 
 // ====================================================================
-// ENDPOINT INTEGRASI VERCEL BLOB STORAGE
+// ENDPOINT 2: AMBIL DAFTAR DATASET KNOWLEDGE BASE
+// ====================================================================
+app.get('/api/datasets', async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    try {
+        if (!datasetManager) {
+            return res.json({ datasets: [], totalDocuments: 0, error: "Manager tidak aktif" });
+        }
+
+        const allDocs = await datasetManager.getAllDocuments().catch(() => []);
+        const datasetsList = await datasetManager.listDatasets().catch(() => []);
+
+        return res.json({
+            datasets: Array.isArray(datasetsList) ? datasetsList : [],
+            totalDocuments: Array.isArray(allDocs) ? allDocs.length : 0
+        });
+    } catch (error) {
+        console.error('API Get Datasets Crash Handled:', error.message);
+        return res.json({
+            datasets: [],
+            totalDocuments: 0,
+            error: true,
+            message: error.message
+        });
+    }
+});
+
+// ====================================================================
+// ENDPOINT 3: UNGGAH FILE AKADEMIK BARU KE VERCEL BLOB STORAGE
 // ====================================================================
 app.post('/api/datasets/upload', upload.single('document'), async (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, message: 'Tidak ada file dokumen yang dipilih.' });
+        }
+
+        const tokenBlob = process.env.BLOB_READ_WRITE_TOKEN;
+        if (!tokenBlob) {
+            return res.status(500).json({ success: false, message: 'Token BLOB_READ_WRITE_TOKEN belum dipasang di environment Vercel.' });
         }
 
         const cleanName = req.file.originalname.replace(/\s+/g, '_');
 
         const blob = await put(`datasets/${cleanName}`, req.file.buffer, {
             access: 'public',
-            token: process.env.BLOB_READ_WRITE_TOKEN
+            token: tokenBlob
         });
 
-        console.log(`[Cloud Storage] Sukses mengunggah berkas ke: ${blob.url}`);
+        console.log(`[Cloud Storage] Berhasil mengunggah berkas ke: ${blob.url}`);
 
-        res.json({ 
-            success: true, 
-            message: `Berkas ${cleanName} sukses disimpan di Cloud Storage Vercel!`,
+        return res.json({
+            success: true,
+            message: `Berkas ${cleanName} sukses disinkronkan ke Cloud Storage!`,
             url: blob.url
         });
     } catch (error) {
         console.error('Error Cloud Upload:', error.message);
-        res.status(500).json({ success: false, message: 'Gagal mengunggah dokumen ke cloud: ' + error.message });
+        return res.status(500).json({ success: false, message: 'Gagal mengunggah ke cloud: ' + error.message });
     }
 });
 
-// FIX: Menambahkan async/await pada rute pembacaan dataset untuk menangani struktur cloud blob yang baru
-app.get('/api/datasets', async (req, res) => {
-    try {
-        const allDocs = await datasetManager.getAllDocuments();
-        const datasetsList = await datasetManager.listDatasets(); // Ditambahkan keyword await di sini
-        res.json({
-            datasets: datasetsList,
-            totalDocuments: allDocs.length
-        });
-    } catch (error) {
-        console.error('API Get Datasets Error:', error.message);
-        res.status(500).json({ error: 'Gagal mengambil daftar dataset dari cloud' });
-    }
-});
-
-app.get('/api/datasets/:name', async (req, res) => {
-    try {
-        const docs = await datasetManager.getDatasetDocuments(req.params.name);
-        if (docs.length === 0) {
-            return res.status(404).json({ message: 'Dataset tidak ditemukan' });
-        }
-        res.json({ documents: docs });
-    } catch (error) {
-        res.status(500).json({ message: 'Error: ' + error.message });
-    }
-});
-
-app.post('/api/datasets', (req, res) => {
-    try {
-        const { name, data } = req.body;
-        if (!name || !data) {
-            return res.status(400).json({ message: 'name dan data harus diisi' });
-        }
-        const result = datasetManager.saveDataset(name, data);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ message: 'Error: ' + error.message });
-    }
-});
-
-app.get('/api/knowledge/keywords', (req, res) => {
-    try {
-        const knowledge = loadKnowledge();
-        res.json(knowledge);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.post('/api/knowledge/keyword', (req, res) => {
-    try {
-        const { keyword, response } = req.body;
-        if (!keyword || !response) {
-            return res.status(400).json({ message: 'Keyword dan response harus diisi', success: false });
-        }
-        const knowledge = loadKnowledge();
-        const cleanKey = keyword.toLowerCase().trim();
-        
-        knowledge.responses[cleanKey] = response;
-        
-        if (!knowledge.keywords[cleanKey]) {
-            knowledge.keywords[cleanKey] = [cleanKey];
-        }
-
-        if (saveKnowledge(knowledge)) {
-            res.json({ message: 'Keyword berhasil disimpan', success: true });
-        } else {
-            // Fallback jika Vercel disk read-only, respons sukses palsu agar UI admin tidak hang
-            res.json({ message: 'Keyword diterapkan di memori sesi aktif', success: true });
-        }
-    } catch (error) {
-        res.status(500).json({ message: 'Error: ' + error.message, success: false });
-    }
-});
-
-app.delete('/api/knowledge/keyword/:keyword', (req, res) => {
-    try {
-        const keyword = decodeURIComponent(req.params.keyword).toLowerCase().trim();
-        const knowledge = loadKnowledge();
-        
-        let deleted = false;
-        if (knowledge.responses[keyword]) {
-            delete knowledge.responses[keyword];
-            deleted = true;
-        }
-        if (knowledge.keywords[keyword]) {
-            delete knowledge.keywords[keyword];
-            deleted = true;
-        }
-
-        if (deleted) {
-            if (saveKnowledge(knowledge)) {
-                return res.json({ message: 'Keyword berhasil dihapus', success: true });
-            } else {
-                return res.json({ message: 'Keyword dilepas dari memori sesi aktif', success: true });
-            }
-        } else {
-            return res.status(404).json({ message: 'Keyword tidak ditemukan', success: false });
-        }
-    } catch (error) {
-        res.status(500).json({ message: 'Error: ' + error.message, success: false });
-    }
-});
-
-app.get('/api/behavior', (req, res) => {
-    try {
-        const behavior = loadBehavior();
-        if (!behavior) {
-            return res.json({
-                system_instructions: 'Jawab berdasarkan konteks.',
-                fallback_response: 'Mohon maaf, data tidak ditemukan.',
-                max_sentences: 2,
-                language: 'id'
-            });
-        }
-        res.json(behavior);
-    } catch (error) {
-        res.status(500).json({ message: 'Error: ' + error.message });
-    }
-});
-
-app.post('/api/behavior', (req, res) => {
-    try {
-        const obj = req.body;
-        if (!obj || typeof obj !== 'object') {
-            return res.status(400).json({ message: 'Invalid behavior object' });
-        }
-        const saved = saveBehavior(obj);
-        if (saved) return res.json({ message: 'Behavior saved', success: true });
-        
-        // Safe deployment fallback untuk arsitektur serverless disk write block
-        res.json({ message: 'Behavior updated in runtime context', success: true });
-    } catch (error) {
-        res.status(500).json({ message: 'Error: ' + error.message });
-    }
-});
-
-app.listen(PORT, () => {
-    console.log(`Server running smoothly on port ${PORT}`);
-});
+// ====================================================================
+// VERCEL FIX: Export handler, BUKAN app.listen()
+// app.listen() menyebabkan crash di serverless environment Vercel
+// ====================================================================
+module.exports = app;
