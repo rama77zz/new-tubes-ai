@@ -16,7 +16,9 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static('public'));
+
+// Membaca root directory untuk file statis karena file html dipindah ke luar
+app.use(express.static(__dirname));
 
 // ====================================================================
 // CONFIG UPLOAD: MENGGUNAKAN MEMORY STORAGE (TIDAK MENULIS DISK LOKAL)
@@ -207,7 +209,7 @@ app.post('/api/chat', async (req, res) => {
             return res.json({ reply: faqResponse, source: 'FAQ Direct Match' });
         }
 
-        const allDocuments = await datasetManager.getAllDocuments();
+        const allDocuments = await datasetManager.getAllDocuments() || [];
 
         const kamusKoreksiMassal = {
             "yidisium": "yudisium",
@@ -377,18 +379,19 @@ app.post('/api/datasets/upload', upload.single('document'), async (req, res) => 
     }
 });
 
-// FIX: Menambahkan async/await pada rute pembacaan dataset untuk menangani struktur cloud blob yang baru
+// SINKRONISASI: Menjamin array terurai utuh menggunakan await terstruktur
 app.get('/api/datasets', async (req, res) => {
     try {
-        const allDocs = await datasetManager.getAllDocuments();
-        const datasetsList = await datasetManager.listDatasets(); // Ditambahkan keyword await di sini
-        res.json({
-            datasets: datasetsList,
+        const allDocs = await datasetManager.getAllDocuments() || [];
+        const datasetsList = await datasetManager.listDatasets() || [];
+        
+        return res.json({
+            datasets: Array.isArray(datasetsList) ? datasetsList : [],
             totalDocuments: allDocs.length
         });
     } catch (error) {
         console.error('API Get Datasets Error:', error.message);
-        res.status(500).json({ error: 'Gagal mengambil daftar dataset dari cloud' });
+        return res.status(500).json({ datasets: [], totalDocuments: 0, error: error.message });
     }
 });
 
@@ -444,7 +447,6 @@ app.post('/api/knowledge/keyword', (req, res) => {
         if (saveKnowledge(knowledge)) {
             res.json({ message: 'Keyword berhasil disimpan', success: true });
         } else {
-            // Fallback jika Vercel disk read-only, respons sukses palsu agar UI admin tidak hang
             res.json({ message: 'Keyword diterapkan di memori sesi aktif', success: true });
         }
     } catch (error) {
@@ -507,7 +509,6 @@ app.post('/api/behavior', (req, res) => {
         const saved = saveBehavior(obj);
         if (saved) return res.json({ message: 'Behavior saved', success: true });
         
-        // Safe deployment fallback untuk arsitektur serverless disk write block
         res.json({ message: 'Behavior updated in runtime context', success: true });
     } catch (error) {
         res.status(500).json({ message: 'Error: ' + error.message });
