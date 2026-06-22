@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "cleanUrls": true,
   "builds": [
     {
       "src": "server-v2.js",
@@ -17,7 +16,7 @@
       "dest": "server-v2.js"
     },
     {
-      "src": "/chat",
+      "src": "/chat.html",
       "dest": "public/chat.html"
     },
     {
