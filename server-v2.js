@@ -5,6 +5,8 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
 const Groq = require('groq-sdk');
+const multer = require('multer'); 
+const { put } = require('@vercel/blob'); // SDK Vercel Blob Storage terintegrasi
 const RAGEngine = require('./lib/rag');
 const DatasetManager = require('./lib/dataset');
 
@@ -15,6 +17,25 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static('public'));
+
+// ====================================================================
+// CONFIG UPLOAD: MENGGUNAKAN MEMORY STORAGE (TIDAK MENULIS DISK LOKAL)
+// ====================================================================
+const storage = multer.memoryStorage(); // Menggunakan RAM buffer agar kompatibel dengan Serverless Vercel
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 4.5 * 1024 * 1024 // Batasan payload maksimal Serverless Vercel (4.5 MB)
+    },
+    fileFilter: function (req, file, cb) {
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (ext !== '.pdf' && ext !== '.csv') {
+            return cb(new Error('Hanya diperbolehkan mengunggah berkas berformat .pdf atau .csv'));
+        }
+        cb(null, true);
+    }
+});
 
 // Inisialisasi Groq SDK
 const groq = new Groq({
@@ -105,10 +126,8 @@ async function getAIResponse(message, contextItems = [], behavior = null, userId
         
         const systemMessage = systemParts.join(' ') + contextText;
 
-        // Ambil riwayat obrolan sebelumnya untuk pengguna web ini
         let history = chatHistories.get(userId) || [];
 
-        // Siapkan array messages untuk Groq
         const messages = [
             { role: 'system', content: systemMessage },
             ...history,
@@ -124,11 +143,9 @@ async function getAIResponse(message, contextItems = [], behavior = null, userId
 
         const aiResponseText = completion.choices[0].message.content;
 
-        // Simpan pesan saat ini ke riwayat obrolan lokal memori
         history.push({ role: 'user', content: message });
         history.push({ role: 'assistant', content: aiResponseText });
 
-        // Batasi memori hanya 10 pesan terakhir (5 tanya, 5 jawab) agar tidak bengkak
         if (history.length > 10) {
             history = history.slice(history.length - 10);
         }
@@ -161,12 +178,21 @@ app.post('/api/chat', async (req, res) => {
         let pesanMasuk = message.toLowerCase().trim(); 
         let faqResponse = null;
 
-        // 1. GARDA TERDEPAN: Cek Kata Kunci Kaku (knowledge.json)
         if (knowledge.keywords && knowledge.responses) {
+            const potonganKataUser = pesanMasuk.split(/\s+/);
             for (const [kunciUtama, daftarKata] of Object.entries(knowledge.keywords)) {
-                if (Array.isArray(daftarKata) && daftarKata.some(kata => pesanMasuk.includes(kata))) {
-                    faqResponse = knowledge.responses[kunciUtama];
-                    break;
+                if (Array.isArray(daftarKata)) {
+                    const adaMencocok = daftarKata.some(kataDariJson => {
+                        if (kataDariJson.includes(" ")) {
+                            return pesanMasuk.includes(kataDariJson);
+                        }
+                        return potonganKataUser.includes(kataDariJson);
+                    });
+
+                    if (adaMencocok) {
+                        faqResponse = knowledge.responses[kunciUtama];
+                        break;
+                    }
                 }
             }
         }
@@ -176,10 +202,8 @@ app.post('/api/chat', async (req, res) => {
             return res.json({ reply: faqResponse, source: 'FAQ Direct Match' });
         }
 
-        // 2. JALUR UTAMA: Ekstraksi Dokumen Menggunakan RAG TF-IDF Lokal
-        const allDocuments = datasetManager.getAllDocuments();
+        const allDocuments = await datasetManager.getAllDocuments();
 
-        // LAYER 1: KAMUS KOREKSI TYPO & BAHASA GAUL/SANTAI
         const kamusKoreksiMassal = {
             "yidisium": "yudisium",
             "yudisum": "yudisium",
@@ -215,14 +239,12 @@ app.post('/api/chat', async (req, res) => {
             "perbaikan nilai": "nilai d atau e mengulang mata kuliah"
         };
 
-        // Memanipulasi isi pesanMasuk yang sudah dideklarasikan di atas
         for (const [salah, benar] of Object.entries(kamusKoreksiMassal)) {
             if (pesanMasuk.includes(salah)) {
                 pesanMasuk = pesanMasuk.replace(new RegExp(`\\b${salah}\\b|${salah}`, 'g'), benar);
             }
         }
 
-        // LAYER 2: PEMBERSIHAN KATA BASA-BASI / STOPWORDS
         const kataBasaBasi = [
             "bagaimana", "apakah", "gimana", "sih", "dong", "kak", "min", "tolong", 
             "mau", "tanya", "saya", "kamu", "itu", "ini", "yang", "di", "ke", "dari", 
@@ -235,7 +257,6 @@ app.post('/api/chat', async (req, res) => {
             .filter(kata => !kataBasaBasi.includes(kata))
             .join(" ");
 
-        // LAYER 3: KAMUS EKSPANSI & SINONIM AKADEMIK MAKSIMAL
         let queryDibersihkan = kataKunciInti;
         const kamusEkspansiMaksimal = {
             "eprt": "eprt toefl ielts kecakapan bahasa inggris skor nilai minimum kelulusan lulus",
@@ -251,7 +272,7 @@ app.post('/api/chat', async (req, res) => {
             "sks": "beban belajar sks maksimal kuota ip ips ambil krs semester",
             "krs": "krs ksm registrasi daftar ulang ukt ksm cetak awal semester",
             "sp": "semester antara pendek sp remedial kelas perkuliahan memperbaiki nilai 9 sks",
-            "do": "drop out sp surat peringatan evaluasi tingkat do spa sanksi akademik",
+            "do": "drop out sp surat peringatan evaluation tingkat do spa sanksi akademik",
             "nilai": "skala nilai bobot indeks mutu konversi a ab b bc c d e terendah",
             "lks": "laporan kemajuan studi lks orang tua broadcast nilai evaluasi",
             "fast track": "fast track skema studi percepatan sarjana magister 10 semester ipk 3.25"
@@ -263,28 +284,24 @@ app.post('/api/chat', async (req, res) => {
             }
         }
 
-        // LAYER 4: PENYELARASAN RIWAYAT CONTEXT (Contextual Chat Awareness)
-// =========================================================================
-// LAYER 4: PENYELARASAN RIWAYAT CONTEXT (Contextual Chat Awareness) - FIXED
-// =========================================================================
-let history = chatHistories.get(activeUserId) || [];
-if (history.length >= 2) { // Dipastikan minimal ada 1 pasang tanya-jawab (2 pesan)
-    const lastUserMsg = history[history.length - 2]?.content || "";
-    if (lastUserMsg.trim() !== "") {
-        const cleanedLastMsg = lastUserMsg
-            .toLowerCase()
-            .split(/\s+/)
-            .filter(k => !kataBasaBasi.includes(k))
-            .join(" ");
-            
-        // Hanya gabungkan jika pesan sebelumnya memiliki kata kunci inti
-        if (cleanedLastMsg.trim() !== "") {
-            queryDibersihkan = `${cleanedLastMsg} ${queryDibersihkan}`;
+        let history = chatHistories.get(activeUserId) || [];
+        if (history.length >= 2) {
+            const lastUserMsg = history[history.length - 2]?.content || "";
+            if (lastUserMsg.trim() !== "") {
+                const cleanedLastMsg = lastUserMsg
+                    .toLowerCase()
+                    .split(/\s+/)
+                    .filter(k => !kataBasaBasi.includes(k))
+                    .join(" ");
+                    
+                if (cleanedLastMsg.trim() !== "") {
+                    queryDibersihkan = `${cleanedLastMsg} ${queryDibersihkan}`;
+                }
+            }
         }
-    }
-}
 
-        // Cari ke dataset menggunakan mesin RAG baru
+        queryDibersihkan = queryDibersihkan.replace(/\s+/g, ' ').trim();
+
         const contextItems = ragEngine.retrieveContext(
             queryDibersihkan,
             allDocuments,
@@ -293,7 +310,6 @@ if (history.length >= 2) { // Dipastikan minimal ada 1 pasang tanya-jawab (2 pes
         
         console.log(`[Web Chat] RAG Final Extracted Query: "${queryDibersihkan}" -> Retrieved ${contextItems.length} context(s)`);
         
-        // 3. PROSES CONTEXT DENGAN GROQ LLM
         const timeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('AI response timeout')), 20000)
         );
@@ -328,18 +344,46 @@ if (history.length >= 2) { // Dipastikan minimal ada 1 pasang tanya-jawab (2 pes
 });
 
 // ====================================================================
-// ENDPOINT MANAJEMEN DATASET & CONFIG (UNTUK DASHBOARD ADMIN)
+// ENDPOINT INTEGRASI VERCEL BLOB STORAGE (UBAHAN UTAMA)
 // ====================================================================
+app.post('/api/datasets/upload', upload.single('document'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: 'Tidak ada file dokumen yang dipilih.' });
+        }
 
-app.get('/api/datasets', (req, res) => {
+        // Normalisasi nama berkas agar ramah URL
+        const cleanName = req.file.originalname.replace(/\s+/g, '_');
+
+        // Unggah data buffer secara publik ke infrastruktur Vercel Blob Cloud
+        const blob = await put(`datasets/${cleanName}`, req.file.buffer, {
+            access: 'public',
+            token: process.env.BLOB_READ_WRITE_TOKEN // Token otomatis di-inject oleh Vercel
+        });
+
+        console.log(`[Cloud Storage] Sukses mengunggah berkas ke: ${blob.url}`);
+
+        res.json({ 
+            success: true, 
+            message: `Berkas ${cleanName} sukses disimpan di Cloud Storage Vercel!`,
+            url: blob.url
+        });
+    } catch (error) {
+        console.error('Error Cloud Upload:', error.message);
+        res.status(500).json({ success: false, message: 'Gagal mengunggah dokumen ke cloud: ' + error.message });
+    }
+});
+
+app.get('/api/datasets', async (req, res) => {
+    const allDocs = await datasetManager.getAllDocuments();
     res.json({
         datasets: datasetManager.listDatasets(),
-        totalDocuments: datasetManager.getAllDocuments().length
+        totalDocuments: allDocs.length
     });
 });
 
-app.get('/api/datasets/:name', (req, res) => {
-    const docs = datasetManager.getDatasetDocuments(req.params.name);
+app.get('/api/datasets/:name', async (req, res) => {
+    const docs = await datasetManager.getDatasetDocuments(req.params.name);
     if (docs.length === 0) {
         return res.status(404).json({ message: 'Dataset tidak ditemukan' });
     }
@@ -375,7 +419,6 @@ app.post('/api/knowledge/keyword', (req, res) => {
         
         knowledge.responses[cleanKey] = response;
         
-        // Memastikan key terdaftar di array keywords juga agar loop for terdepan bekerja
         if (!knowledge.keywords[cleanKey]) {
             knowledge.keywords[cleanKey] = [cleanKey];
         }
@@ -443,7 +486,6 @@ app.post('/api/behavior', (req, res) => {
     }
 });
 
-// Menjalankan server Express
 app.listen(PORT, () => {
     console.log(`Server running smoothly on port ${PORT}`);
 });

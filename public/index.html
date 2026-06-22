@@ -6,129 +6,302 @@
     <title>SSC Telkom University Surabaya</title>
     <style>
         :root {
-            --wa-bg: #fcf4ec;
-            --wa-green: #b31117;
-            --wa-text: #111b21;
-            --wa-border: #111b21;
+            --bg-color: #fdfcfb;
+            --card-bg: #ffffff;
+            --primary-color: #b31117;
+            --primary-hover: #8a0d12;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --success-color: #059669;
+            --error-color: #dc2626;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
         }
 
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
 
         body {
-            background-color: var(--wa-bg);
-            color: var(--wa-text);
+            background-color: var(--bg-color);
+            color: var(--text-main);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow-x: hidden;
         }
 
         nav {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 20px 50px;
+            padding: 20px 8%;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
         }
 
         .logo-container {
-            font-weight: bold;
-            font-size: 20px;
-            color: var(--wa-green);
-        }
-
-        .btn-staff {
-            color: var(--wa-text);
-            text-decoration: none;
-            font-size: 14px;
-            border: 1px solid var(--wa-border);
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-weight: 500;
+            font-weight: 700;
+            font-size: 18px;
+            letter-spacing: -0.3px;
+            color: var(--text-main);
         }
 
         main {
             flex: 1;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 40px 10%;
             max-width: 1400px;
-            margin: 0 auto;
             width: 100%;
+            margin: 0 auto;
+            padding: 50px 8%;
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 50px;
+            align-items: start;
         }
 
-        .left-content {
-            flex: 1;
-            max-width: 500px;
+        .left-column, .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 28px;
         }
 
-        .left-content h1 {
-            font-size: 85px;
-            line-height: 1.05;
-            letter-spacing: -2px;
-            margin-bottom: 40px;
-            font-weight: 500;
+        .hero-section h1 {
+            font-size: 46px;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+            color: var(--text-main);
+            margin-bottom: 16px;
+            line-height: 1.15;
         }
 
-        /* TOMBOL UTAMA: Membuka chat.html di Tab Baru */
+        .hero-section p {
+            color: var(--text-muted);
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .action-area {
+            display: flex;
+            margin-bottom: 4px;
+        }
+
         .btn-start-chat {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
             text-decoration: none;
-            color: var(--wa-text);
-            border: 1px solid var(--wa-border);
-            padding: 14px 32px;
-            border-radius: 30px;
-            font-size: 18px;
-            font-weight: 500;
-            transition: all 0.2s ease;
+            color: white;
+            background: var(--primary-color);
+            padding: 14px 36px;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 600;
+            transition: background 0.2s ease-in-out;
+            box-shadow: 0 4px 12px rgba(179, 17, 23, 0.1);
         }
 
         .btn-start-chat:hover {
-            background: var(--wa-border);
-            color: white;
+            background: var(--primary-hover);
         }
 
-        .right-content {
-            flex: 1;
+        .content-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .content-card h3, .content-card h4 {
+            font-size: 13px;
+            margin-bottom: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-main);
+        }
+
+        .file-input-wrapper {
             display: flex;
             flex-direction: column;
-            align-items: flex-end;
+            gap: 14px;
+        }
+
+        .input-file-zone {
             position: relative;
-            max-width: 500px;
+            border: 1px dashed var(--border-color);
+            padding: 24px;
+            border-radius: 6px;
+            text-align: center;
+            background: #f8fafc;
+            transition: all 0.2s ease;
+            cursor: pointer;
         }
 
-        .chat-bubble-static {
-            background: #ffffff;
-            padding: 16px 20px;
-            border-radius: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            margin-bottom: 30px;
-            max-width: 350px;
-            font-size: 16px;
-            line-height: 1.4;
+        .input-file-zone:hover {
+            border-color: var(--text-main);
+            background: #f1f5f9;
         }
 
-        .bubble-1 { align-self: flex-start; border-top-left-radius: 4px; }
-        .bubble-2 { align-self: flex-end; border-top-right-radius: 4px; margin-top: 150px; }
-
-        .doodle-container {
+        .input-file {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -60%);
-            width: 200px;
-            opacity: 0.9;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
         }
 
-        @media (max-width: 900px) {
-            main { flex-direction: column; text-align: center; padding: 20px 5%; }
-            .left-content h1 { font-size: 50px; }
-            .right-content { display: none; }
+        .zone-text {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .zone-text strong {
+            color: var(--text-main);
+        }
+
+        .btn-upload {
+            background-color: var(--text-main);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .btn-upload:hover {
+            background-color: #0f172a;
+        }
+
+        .upload-status {
+            font-size: 13px;
+            font-weight: 500;
+            margin-top: 4px;
+        }
+
+        .knowledge-status-box ul {
+            list-style: none;
+            max-height: 180px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .knowledge-status-box ul::-webkit-scrollbar {
+            width: 4px;
+        }
+        .knowledge-status-box ul::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 2px;
+        }
+
+        .knowledge-status-box li {
+            font-size: 13px;
+            background: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 500;
+        }
+
+        .badge-type {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-pdf { background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; }
+        .badge-csv { background: #dcfce7; color: #16a34a; border: 1px solid #86efac; }
+
+        /* KANAN: PANEL INFORMASI DAN FITUR */
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .feature-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            border-radius: 6px;
+        }
+
+        .feature-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 6px;
+        }
+
+        .feature-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .guide-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .guide-step {
+            display: flex;
+            gap: 14px;
+            align-items: start;
+        }
+
+        .step-number {
+            background: #f1f5f9;
+            color: var(--text-main);
+            font-size: 11px;
+            font-weight: 700;
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            border: 1px solid var(--border-color);
+        }
+
+        .guide-text {
+            font-size: 13px;
+            line-height: 1.5;
+            color: var(--text-main);
+        }
+
+        .guide-text span {
+            display: block;
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        @media (max-width: 968px) {
+            main { grid-template-columns: 1fr; gap: 32px; padding: 40px 24px; }
+            .hero-section h1 { font-size: 34px; }
         }
     </style>
 </head>
@@ -139,29 +312,176 @@
     </nav>
 
     <main>
-        <div class="left-content">
-            <h1>Halo.<br>Butuh Bantuan<br>Akademik?</h1>
-            <a href="/chat.html" target="_blank" class="btn-start-chat">
-                Mulai Tanya Chatbot
-            </a>
+        <!-- KOLOM KIRI: CORE ACTION (HERO, UPLOAD, DATASET) -->
+        <div class="left-column">
+            <div class="hero-section">
+                <h1>Pusat Informasi Akademik</h1>
+                <p>Sistem layanan validasi regulasi akademik Telkom University Surabaya. Akses informasi ketentuan SKS, prosedur KRS, berkas Yudisium, hingga standardisasi nilai EPrT melalui basis data cerdas terintegrasi.</p>
+            </div>
+
+            <div class="action-area">
+                <a href="/chat.html" target="_blank" class="btn-start-chat">
+                    Buka Konsultasi Chatbot
+                </a>
+            </div>
+
+            <div class="content-card upload-container">
+                <h3>Integrasi Dokumen Pengetahuan</h3>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="file-input-wrapper">
+                        <div class="input-file-zone">
+                            <span class="zone-text" id="fileZoneText">Tarik dokumen ke sini atau <strong>Pilih Berkas</strong> (.pdf / .csv)</span>
+                            <input type="file" id="documentFile" name="document" accept=".pdf,.csv" class="input-file" required>
+                        </div>
+                        <button type="submit" class="btn-upload">Unggah ke Cloud Storage</button>
+                    </div>
+                </form>
+                <div id="uploadStatus" class="upload-status"></div>
+            </div>
+
+            <div class="content-card knowledge-status-box">
+                <h4>Knowledge Base Terkoneksi</h4>
+                <ul id="fileList">
+                    <li style="color: var(--text-muted);">Sinkronisasi cloud storage aktif...</li>
+                </ul>
+            </div>
         </div>
 
-        <div class="right-content">
-            <div class="chat-bubble-static bubble-1">
-                Bingung nyari aturan pengambilan SKS dan skor minimal EPrT? 
+        <!-- KOLOM KANAN: KONTEN PENDUKUNG (MERIAH & PADAT INFORMASI) -->
+        <div class="right-column">
+            <!-- KAPABILITAS SISTEM -->
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-title">Ekstraksi PDF</div>
+                    <div class="feature-desc">Membaca berkas regulasi, SK rektorat, dan buku pedoman akademik secara otomatis.</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-title">Pemetaan Tabel</div>
+                    <div class="feature-desc">Memproses basis data tabular berformat CSV untuk akurasi data nilai dan poin standar.</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-title">Sistem RAG Cloud</div>
+                    <div class="feature-desc">Penyimpanan dokumen terpusat di cloud storage menjamin data tidak hilang saat dijalankan.</div>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-title">Konteks Sesi</div>
+                    <div class="feature-desc">Asisten virtual mengingat alur percakapan sebelumnya untuk respon yang relevan.</div>
+                </div>
             </div>
-            <div class="doodle-container">
-                <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="100" cy="100" r="80" stroke="#111B21" stroke-width="4"/>
-                    <path d="M60 90C60 90 70 80 85 90M140 90C140 90 130 80 115 90" stroke="#111B21" stroke-width="4"/>
-                    <path d="M80 135C80 134 95 120 120 135" stroke="#111B21" stroke-width="4"/>
-                </svg>
-            </div>
-            <div class="chat-bubble-static bubble-2">
-                Smart Chatbot SSC siap menjawab otomatis pertanyaan Anda 24/7.
+
+            <!-- PANDUAN MANAJEMEN PENGETAHUAN -->
+            <div class="content-card">
+                <h4>Panduan Pembaruan Data</h4>
+                <div class="guide-list">
+                    <div class="guide-step">
+                        <div class="step-number">1</div>
+                        <div class="guide-text">
+                            Siapkan Berkas Regulasi
+                            <span>Pastikan file bertipe PDF teks (bukan hasil scan gambar) atau berkas CSV terstruktur.</span>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <div class="step-number">2</div>
+                        <div class="guide-text">
+                            Unggah ke Infrastruktur Cloud
+                            <span>Gunakan panel zona drop-file di sisi kiri halaman untuk mengirimkan dokumen pengetahuan.</span>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <div class="step-number">3</div>
+                        <div class="guide-text">
+                            Proses Sinkronisasi Otomatis
+                            <span>Sistem akan langsung membagi berkas menjadi kluster data kecil dan memasukkannya ke indeks pencarian.</span>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <div class="step-number">4</div>
+                        <div class="guide-text">
+                            Konsultasi Berbasis Data Baru
+                            <span>Buka ruang obrolan chatbot, dan kecerdasan buatan siap menjawab menggunakan referensi terbaru.</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </main>
 
+    <script>
+        const fileInput = document.getElementById('documentFile');
+        const fileZoneText = document.getElementById('fileZoneText');
+
+        fileInput.addEventListener('change', function() {
+            if(fileInput.files.length > 0) {
+                fileZoneText.innerHTML = `Berkas terpilih: <strong>${fileInput.files[0].name}</strong>`;
+            }
+        });
+
+        async function fetchActiveKnowledge() {
+            const fileListEl = document.getElementById('fileList');
+            try {
+                const response = await fetch('/api/datasets');
+                const data = await response.json();
+                
+                if (data.datasets && data.datasets.length > 0) {
+                    fileListEl.innerHTML = '';
+                    data.datasets.forEach(file => {
+                        const isPdf = file.toLowerCase().endsWith('.pdf');
+                        const badgeClass = isPdf ? 'badge-pdf' : 'badge-csv';
+                        const badgeText = isPdf ? 'pdf' : 'csv';
+                        
+                        const li = document.createElement('li');
+                        li.innerHTML = `
+                            <div class="file-info">
+                                <span class="badge-type ${badgeClass}">${badgeText}</span>
+                                <strong>${file}</strong>
+                            </div>
+                        `;
+                        fileListEl.appendChild(li);
+                    });
+                } else {
+                    fileListEl.innerHTML = '<li style="color: var(--text-muted);">Cloud Storage kosong. Silakan unggah berkas pertama Anda.</li>';
+                }
+            } catch (error) {
+                fileListEl.innerHTML = '<li style="color: var(--error-color);">Gagal memuat status database RAG.</li>';
+            }
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const statusDiv = document.getElementById('uploadStatus');
+            if (fileInput.files.length === 0) return;
+
+            const formData = new FormData();
+            formData.append('document', fileInput.files[0]);
+
+            statusDiv.style.color = 'var(--text-main)';
+            statusDiv.innerText = 'Memproses berkas dan memperbarui indeks sistem...';
+
+            try {
+                const response = await fetch('/api/datasets/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    statusDiv.style.color = 'var(--success-color)';
+                    statusDiv.innerText = 'Sukses: ' + result.message;
+                    fileInput.value = ''; 
+                    fileZoneText.innerHTML = 'Tarik dokumen ke sini atau <strong>Pilih Berkas</strong> (.pdf / .csv)';
+                    fetchActiveKnowledge(); 
+                } else {
+                    statusDiv.style.color = 'var(--error-color)';
+                    statusDiv.innerText = 'Gagal: ' + result.message;
+                }
+            } catch (err) {
+                statusDiv.style.color = 'var(--error-color)';
+                statusDiv.innerText = 'Error koneksi server: ' + err.message;
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', fetchActiveKnowledge);
+    </script>
 </body>
 </html>

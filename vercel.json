@@ -16,6 +16,14 @@
       "dest": "server-v2.js"
     },
     {
+      "src": "/admin.html",
+      "dest": "public/admin.html"
+    },
+    {
+      "src": "/chat.html",
+      "dest": "public/chat.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "public/$1"
     }
