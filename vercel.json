@@ -11,6 +11,7 @@
       "maxDuration": 10
     }
   },
+  
   "routes": [
     {
       "src": "/api/(.*)",
